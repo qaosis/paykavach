@@ -1,0 +1,880 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>PayKavach Console</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: operations console — KPI strip, live feed beside decision detail, then tester / analyst queue / mule network, then model weights */
+:root{
+  --bg:#EDF1EF; --surface:#FBFCFB; --surface-2:#F3F6F4; --ink:#0F1F2E; --muted:#52606B; --line:#D5DED9;
+  --brand:#187349; --brand-soft:#DCEFE4; --btn:#0F1F2E; --btn-ink:#F3F6F1;
+  --allow:#1E7A4F; --allow-soft:#DDF1E6; --hold:#9A6212; --hold-soft:#FBEBCF; --block:#B3352D; --block-soft:#F8DEDA;
+  --node:#8796A1; --edge:rgba(15,31,46,.16);
+  --f-display:'Space Grotesk', 'Trebuchet MS', sans-serif; --f-body:'Public Sans', Arial, sans-serif; --f-mono:'JetBrains Mono', 'Courier New', monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0A131B; --surface:#112030; --surface-2:#0E1A26; --ink:#E6EDF0; --muted:#9AABB6; --line:#22364A;
+  --brand:#6FD6A0; --brand-soft:#173B2C; --btn:#6FD6A0; --btn-ink:#0A131B;
+  --allow:#58C892; --allow-soft:#163528; --hold:#E9B44F; --hold-soft:#3A2D12; --block:#F2766C; --block-soft:#3D1D1B;
+  --node:#6B7F8E; --edge:rgba(230,237,240,.14); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0A131B; --surface:#112030; --surface-2:#0E1A26; --ink:#E6EDF0; --muted:#9AABB6; --line:#22364A;
+  --brand:#6FD6A0; --brand-soft:#173B2C; --btn:#6FD6A0; --btn-ink:#0A131B;
+  --allow:#58C892; --allow-soft:#163528; --hold:#E9B44F; --hold-soft:#3A2D12; --block:#F2766C; --block-soft:#3D1D1B;
+  --node:#6B7F8E; --edge:rgba(230,237,240,.14); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:20px 40px}
+.wrap{max-width:1360px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font-size:18px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:12px}
+.mark{width:40px;height:40px;border-radius:10px;background:var(--ink);display:grid;place-items:center;color:var(--bg)}
+.brand h1{font-size:24px}
+.brand p{margin:0;color:var(--muted);font-size:13px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;font-weight:600}
+.btn.primary{background:var(--btn);color:var(--btn-ink);border-color:var(--btn)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.live{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--allow)}
+.paused .dot{background:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.live:not(.paused) .dot{animation:pulse 1.4s infinite}}
+@keyframes pulse{50%{opacity:.25}}
+select{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 10px}
+
+/* kpis */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.kpi{background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.kpi span{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.kpi b{font-family:var(--f-display);font-size:26px;font-variant-numeric:tabular-nums}
+.kpi small{color:var(--muted);font-size:12px}
+.kpi.allow b{color:var(--allow)} .kpi.hold b{color:var(--hold)} .kpi.block b{color:var(--block)}
+
+/* panels */
+.grid-a{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr);gap:18px}
+.grid-b{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1fr) minmax(0,1.15fr);gap:18px}
+@media (max-width:1100px){.grid-b{grid-template-columns:1fr 1fr}.grid-b .net{grid-column:1 / -1}}
+@media (max-width:860px){.grid-a,.grid-b{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.ph p{margin:0;color:var(--muted);font-size:13px}
+
+/* feed */
+.feed{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{position:sticky;top:0;background:var(--surface-2);text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:8px 10px;font-weight:600;z-index:1}
+td{padding:8px 10px;border-top:1px solid var(--line);white-space:nowrap;vertical-align:middle}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--surface-2)}
+tbody tr.sel{background:var(--brand-soft)}
+td.amt{text-align:right}
+.vpa{font-family:var(--f-mono);font-size:12.5px}
+.arrow{color:var(--muted);padding:0 4px}
+.bar{width:64px;height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;display:inline-block;vertical-align:middle;margin-right:6px;border:1px solid var(--line)}
+.bar i{display:block;height:100%}
+.pill{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:999px}
+.pill.allow{background:var(--allow-soft);color:var(--allow)}
+.pill.hold{background:var(--hold-soft);color:var(--hold)}
+.pill.block{background:var(--block-soft);color:var(--block)}
+.reason-cell{color:var(--muted);max-width:280px;overflow:hidden;text-overflow:ellipsis}
+.tag{font-size:11px;border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--muted);margin-left:6px}
+
+/* detail */
+.score{display:flex;gap:16px;align-items:center}
+.ring{position:relative;width:104px;height:104px;flex:none}
+.ring svg{width:104px;height:104px;transform:rotate(-90deg)}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--f-display);font-size:30px;font-variant-numeric:tabular-nums}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13.5px;min-width:0}
+.facts dt{color:var(--muted)} .facts dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.contrib{display:flex;flex-direction:column;gap:6px}
+.crow{display:grid;grid-template-columns:150px 1fr 48px;gap:8px;align-items:center;font-size:13px}
+.ctrack{height:10px;background:var(--surface-2);border-radius:5px;position:relative;border:1px solid var(--line)}
+.ctrack i{position:absolute;top:0;bottom:0;left:0;border-radius:5px;background:var(--block)}
+.ctrack i.neg{background:var(--allow)}
+.reasons{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.truth{font-size:12.5px;color:var(--muted);border-top:1px dashed var(--line);padding-top:10px}
+.empty{color:var(--muted);font-size:14px;padding:24px 4px}
+
+/* phone */
+.tester{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:14px}
+@media (max-width:520px){.tester{grid-template-columns:1fr}}
+.form{display:flex;flex-direction:column;gap:10px}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.form input[type=number],.form input[type=time],.form select{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 10px;color:var(--ink);font-weight:400;font-size:14px}
+.checks{display:flex;flex-direction:column;gap:6px;font-size:13.5px}
+.checks label{flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-weight:500}
+.phone{border:2px solid var(--ink);border-radius:26px;padding:14px 12px;background:var(--surface-2);min-height:380px;display:flex;flex-direction:column;gap:10px}
+.notch{width:60px;height:5px;border-radius:3px;background:var(--line);align-self:center}
+.screen{flex:1;display:flex;flex-direction:column;gap:10px;font-size:13.5px}
+.screen h3{font-size:16px}
+.payee{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:2px}
+.big{font-family:var(--f-display);font-size:28px}
+.alertbox{border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.alertbox.hold{background:var(--hold-soft);color:var(--ink);border:1px solid var(--hold)}
+.alertbox.block{background:var(--block-soft);border:1px solid var(--block)}
+.alertbox.allow{background:var(--allow-soft);border:1px solid var(--allow)}
+.alertbox ul{margin:0;padding-left:18px}
+.stack{display:flex;flex-direction:column;gap:6px;margin-top:auto}
+
+/* queue */
+.queue{display:flex;flex-direction:column;gap:8px;max-height:420px;overflow:auto}
+.qi{border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;background:var(--surface)}
+.qi .row{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.qi p{margin:0;font-size:12.5px;color:var(--muted)}
+.qbtns{display:flex;gap:6px}
+.qbtns .btn{padding:5px 10px;font-size:13px}
+.stats{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.stats b{color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* network */
+canvas{width:100%;height:360px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+
+/* weights */
+.wt{overflow-x:auto}
+.wt td,.wt th{white-space:nowrap}
+.delta.up{color:var(--block)} .delta.down{color:var(--allow)}
+.note{font-size:12.5px;color:var(--muted);margin:0}
+.source{gap:14px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;padding:3px;background:var(--surface-2);flex-wrap:wrap;gap:2px}
+.seg button{border:none;background:none;border-radius:7px;padding:8px 14px;font-weight:600;color:var(--muted)}
+.seg button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(15,31,46,.15)}
+.srcgrid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px}
+@media (max-width:860px){.srcgrid{grid-template-columns:1fr}}
+.srcgrid h3{font-size:15px}
+.srcgrid p{margin:0;font-size:14px;color:var(--muted)}
+.prof{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.prof div{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.prof span{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.prof b{font-family:var(--f-mono);font-size:14px;overflow-wrap:anywhere}
+.src textarea{width:100%;min-height:96px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface);color:var(--ink);font-family:var(--f-mono);font-size:12.5px;resize:vertical}
+.src input[type=text]{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface);color:var(--ink)}
+.filebtn{display:inline-flex;align-items:center}
+.ok-line{font-size:13.5px;color:var(--allow)} .err-line{font-size:13.5px;color:var(--block)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;z-index:20}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+      </div>
+      <div>
+        <h1>PayKavach</h1>
+        <p>Real-time UPI risk engine · demo on synthetic payments</p>
+      </div>
+    </div>
+    <div class="controls">
+      <span class="live" id="live"><span class="dot"></span><span id="clock" class="mono">—</span></span>
+      <label for="speed" class="live">Speed</label>
+      <select id="speed">
+        <option value="1400">1 payment / 1.4 s</option>
+        <option value="700" selected>1 payment / 0.7 s</option>
+        <option value="250">Fast</option>
+      </select>
+      <button class="btn primary" id="toggle">Pause stream</button>
+    </div>
+  </header>
+
+  <section class="panel source src" aria-label="Data source">
+    <div class="ph"><h2>Data source</h2>
+      <div class="seg" role="tablist" id="modeSeg">
+        <button role="tab" data-mode="demo" aria-selected="true">Synthetic demo</button>
+        <button role="tab" data-mode="live" aria-selected="false">Live (real time)</button>
+        <button role="tab" data-mode="statement" aria-selected="false">My UPI statement</button>
+      </div>
+    </div>
+    <div id="src-demo"><p class="note" style="font-size:14px">A simulated stream of UPI payments, including known scam patterns, so the model can be measured against a known truth. Switch to <b>Live</b> to score your own payments in real time, or <b>My UPI statement</b> to score your real transaction history.</p></div>
+    <div id="src-live" class="srcgrid" hidden>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <h3>Your live profile</h3>
+        <p>Every payment you make below is scored at the real time it happens, from this real browser and device. PayKavach learns your usual amounts, hours and payees as you go, and keeps them in this browser only.</p>
+        <div class="prof">
+          <div><span>Payments learned</span><b id="pf-n">0</b></div>
+          <div><span>Usual amount</span><b id="pf-med">—</b></div>
+          <div><span>Usual hours</span><b id="pf-hrs">—</b></div>
+          <div><span>Known payees</span><b id="pf-pay">0</b></div>
+          <div><span>This device</span><b id="pf-dev">—</b></div>
+          <div><span>Known devices</span><b id="pf-devn">0</b></div>
+        </div>
+        <div class="controls"><button class="btn" id="liveReset">Clear my live history</button></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <h3>Reported UPI IDs</h3>
+        <p>Paste UPI IDs you know are fraudulent (for example ones you have reported at cybercrime.gov.in), one per line. Paying any of them sets the mule signal to maximum.</p>
+        <label for="reported" class="note">Reported IDs</label>
+        <textarea id="reported" spellcheck="false" placeholder="kyc.helpdesk24@ybl"></textarea>
+        <p class="note">On a phone, “on a call” and “screen sharing” would come from the operating system. A web page can’t read them, so tick them yourself when testing.</p>
+      </div>
+    </div>
+    <div id="src-statement" class="srcgrid" hidden>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <h3>Score your real statement</h3>
+        <p>Export a CSV statement from your bank’s net banking or UPI app and add it here. It is read in this browser only and never uploaded. Outgoing payments are scored one by one in date order, with your profile learned from earlier payments.</p>
+        <div class="controls">
+          <label class="btn primary filebtn" for="csvFile">Choose CSV file</label><input type="file" id="csvFile" accept=".csv,text/csv,text/plain" hidden>
+          <button class="btn" id="sampleCsv">Load a sample statement</button>
+        </div>
+        <label for="csvText" class="note">Or paste the CSV text</label>
+        <textarea id="csvText" spellcheck="false" placeholder="Date,Time,Description,Debit,Credit"></textarea>
+        <div class="controls"><button class="btn primary" id="analyse">Score statement</button></div>
+        <p id="csvMsg" class="note" aria-live="polite"></p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <h3>What a statement can and can’t show</h3>
+        <p>Columns are detected automatically: date, optional time, description or narration, and debit/withdrawal or amount with a Dr/Cr type. UPI IDs are read from the description.</p>
+        <p>A statement has no device or call information, so those signals stay off. Scoring uses amount spikes, new payees, unusual hours (when the statement has times), bursts of payments and your reported-ID list.</p>
+        <div class="prof">
+          <div><span>Rows read</span><b id="st-rows">—</b></div>
+          <div><span>Payments scored</span><b id="st-debits">—</b></div>
+          <div><span>Period</span><b id="st-period">—</b></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="kpis" aria-label="Live totals">
+    <div class="kpi"><span>Payments scored</span><b id="k-total">0</b><small>since start</small></div>
+    <div class="kpi allow"><span>Allowed</span><b id="k-allow">0</b><small id="k-allow-p">—</small></div>
+    <div class="kpi hold"><span>Held to confirm</span><b id="k-hold">0</b><small id="k-hold-p">—</small></div>
+    <div class="kpi block"><span>Blocked</span><b id="k-block">0</b><small id="k-block-p">—</small></div>
+    <div class="kpi"><span>Fraud caught</span><b id="k-recall">—</b><small id="k-recall-s">held or blocked</small></div>
+    <div class="kpi"><span>False alarms</span><b id="k-fpr">—</b><small id="k-fpr-s">genuine payments flagged</small></div>
+    <div class="kpi"><span>Scoring time</span><b id="k-lat">—</b><small>per payment, this browser</small></div>
+  </section>
+
+  <div class="grid-a">
+    <section class="panel">
+      <div class="ph"><h2>Live payments</h2><p>Click a row to see why it was scored that way</p></div>
+      <div class="feed">
+        <table>
+          <thead><tr><th>Time</th><th>From → To</th><th style="text-align:right">Amount</th><th>Risk</th><th>Decision</th><th>Top reason</th></tr></thead>
+          <tbody id="feed"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="panel" id="detail" aria-live="polite">
+      <div class="ph"><h2>Decision detail</h2></div>
+      <div id="detailBody" class="empty">Select a payment from the feed.</div>
+    </section>
+  </div>
+
+  <div class="grid-b">
+    <section class="panel">
+      <div class="ph"><h2>Try a payment</h2><p>See what the user would see</p></div>
+      <div class="tester">
+        <form class="form" id="payForm">
+          <label for="fFrom" id="lblFrom">Paying from<select id="fFrom"></select></label>
+          <label for="fTo" id="lblTo">Paying to<select id="fTo"></select></label>
+          <label for="fToText" id="lblToText" hidden>Paying to (UPI ID)<input id="fToText" type="text" list="payeeList" placeholder="name@bank" autocomplete="off" style="border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 10px;color:var(--ink);font-weight:400;font-size:14px"><datalist id="payeeList"></datalist></label>
+          <label for="fAmt">Amount (₹)<input id="fAmt" type="number" min="1" step="1" value="45000"></label>
+          <label for="fTime" id="lblTime">Time<input id="fTime" type="time" value="21:40"></label>
+          <p class="note" id="timeNow" hidden>Time: now, from your real clock</p>
+          <div class="checks">
+            <label for="fCall"><input type="checkbox" id="fCall" checked> On a phone call</label>
+            <label for="fShare"><input type="checkbox" id="fShare"> Screen-sharing app open</label>
+            <label for="fDev"><input type="checkbox" id="fDev"> <span id="fDevLbl">New device</span></label>
+          </div>
+          <button class="btn primary" type="submit" id="payBtn">Pay</button>
+          <p class="note" id="testerNote">Preset: a “digital arrest” scam call. Change the fields to explore.</p>
+        </form>
+        <div class="phone" aria-label="Phone preview">
+          <div class="notch"></div>
+          <div class="screen" id="screen"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="ph"><h2>Analyst queue</h2><p>Held and blocked payments to review</p></div>
+      <div class="stats"><span>Reviewed <b id="q-rev">0</b></span><span>Marked fraud <b id="q-f">0</b></span><span>Marked genuine <b id="q-g">0</b></span></div>
+      <div class="queue" id="queue"></div>
+      <div class="controls">
+        <button class="btn" id="autolabel" title="Uses the synthetic ground truth to label waiting items">Label 20 from demo truth</button>
+        <button class="btn primary" id="retrain">Retrain model</button>
+      </div>
+      <p class="note" id="retrainNote">Analyst verdicts become training labels. Retraining needs at least 5 fraud and 5 genuine labels.</p>
+    </section>
+
+    <section class="panel net">
+      <div class="ph"><h2>Mule network</h2><p>Accounts linked by recent payments</p></div>
+      <canvas id="net" aria-label="Graph of accounts and payments; suspected mule accounts shown in red"></canvas>
+      <div class="legend">
+        <span><i style="background:var(--node)"></i>Customer</span>
+        <span><i style="background:var(--hold)"></i>Watch: several unrelated senders</span>
+        <span><i style="background:var(--block)"></i>Likely mule account</span>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="ph"><h2>Model weights</h2><p>Logistic model over eight signals. Retraining updates these from analyst labels.</p></div>
+    <div class="wt"><table><thead><tr><th>Signal</th><th>What it measures</th><th style="text-align:right">Weight</th><th style="text-align:right">Last change</th></tr></thead><tbody id="weights"></tbody></table></div>
+    <p class="note">Tiers: score below 40 is allowed, 40–75 is held for confirmation, above 75 is blocked. All accounts, names and UPI IDs are synthetic.</p>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+'use strict';
+// ---------- seeded randomness ----------
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rand = mulberry32(20261023);
+const pick = arr => arr[Math.floor(rand()*arr.length)];
+const between = (a,b) => a + rand()*(b-a);
+const lognorm = s => Math.exp((rand()+rand()+rand()-1.5)*s*1.15);
+
+// ---------- synthetic world ----------
+const NAMES = ['Aarav Shah','Priya Iyer','Rahul Verma','Sneha Pillai','Vikram Rao','Ananya Das','Karthik Raman','Divya Menon','Arjun Nair','Meera Joshi','Rohan Gupta','Kavya Reddy','Siddharth Bose','Isha Kapoor','Nikhil Jain','Pooja Hegde','Aditya Kulkarni','Lakshmi Sundaram','Varun Malhotra','Neha Sinha','Manoj Pandey','Deepa Krishnan','Suresh Babu','Fatima Sheikh','Imran Qureshi','Zoya Ansari','Harish Gowda','Revathi Subramanian','Gaurav Mishra','Shalini Mathur','Tarun Chawla','Bhavna Patel'];
+const HANDLES = ['oksbi','okhdfcbank','okicici','okaxis','ybl','ibl','paytm'];
+const MERCHANTS = ['freshbasket.grocer@ybl','metrocard.recharge@okaxis','citygas.bill@oksbi','annapoorna.mess@ibl','campus.books@okicici','quickcab.rides@paytm','pharmaplus.store@ybl','cinema.tickets@okhdfcbank'];
+const MULE_VPAS = ['kyc.helpdesk24@ybl','refund.support.desk@paytm','rk.traders77@ibl','customs.clearance.in@oksbi','lucky.rewards99@okaxis','fasttrack.loans@ybl','cbi.verification.cell@paytm','prime.investments.club@ibl'];
+
+const users = NAMES.map((n,i)=>{
+  const first=n.split(' ')[0].toLowerCase();
+  const median = Math.round(pick([300,450,600,800,1200,1800,2500,4000])*between(.8,1.2));
+  const start = pick([6,7,8,9]); const end = pick([21,22,23]);
+  return {id:'u'+i,name:n,vpa:`${first}.${(n.split(' ')[1]||'').toLowerCase().slice(0,4)}${10+i}@${pick(HANDLES)}`,median,start,end,device:'dev-'+i,payees:new Set(),kind:'user'};
+});
+users.forEach(u=>{ while(u.payees.size<4){const o=pick(users); if(o!==u) u.payees.add(o.vpa);} u.payees.add(pick(MERCHANTS)); u.circle=new Set(u.payees); });
+// people who already know each other: a payment between them is never "unrelated"
+const related = (a,b) => { const A=accounts.get(a), B=accounts.get(b); return !!((A&&A.circle&&A.circle.has(b))||(B&&B.circle&&B.circle.has(a))); };
+const mules = MULE_VPAS.map((v,i)=>({id:'m'+i,name:'Unknown account',vpa:v,median:5000,start:0,end:24,device:'mdev-'+i,payees:new Set(),kind:'mule'}));
+const accounts = new Map(); [...users,...mules].forEach(a=>accounts.set(a.vpa,a));
+// the real user (live + statement modes): profile learned from their own payments
+const ME_VPA = 'you';
+const me = {id:'me',name:'You',vpa:ME_VPA,kind:'user',dynamic:true,median:1000,start:7,end:23,device:'',payees:new Set(),circle:new Set(),amounts:[],hours:[],devices:new Set()};
+accounts.set(ME_VPA, me);
+const reportedIds = new Set();
+function resetMe(){ me.median=1000; me.start=7; me.end=23; me.payees=new Set(); me.amounts=[]; me.hours=[]; me.devices=new Set(); }
+function updateProfile(acc,p){
+  acc.amounts.push(p.amount); if(acc.amounts.length>120) acc.amounts.shift();
+  const sorted=[...acc.amounts].sort((a,b)=>a-b); acc.median = sorted[Math.floor(sorted.length/2)];
+  if(!p.noTime){ acc.hours.push(hourOf(p.time)); if(acc.hours.length>120) acc.hours.shift();
+    if(acc.hours.length>=8){ const h=[...acc.hours].sort((a,b)=>a-b); acc.start=h[Math.floor(h.length*0.05)]; acc.end=Math.min(24,h[Math.ceil(h.length*0.95)-1]+1); } }
+  if(p.device) acc.devices.add(p.device);
+  if(p.tier!=='block' && reviewed.get(p.id)!=='fraud') acc.payees.add(p.to);
+}
+// a real fingerprint of this browser and device (no tracking, never leaves the page)
+function deviceFingerprint(){
+  let raw=''; try{ raw=[navigator.userAgent,navigator.platform,navigator.language,screen.width+'x'+screen.height,screen.colorDepth,Intl.DateTimeFormat().resolvedOptions().timeZone,navigator.hardwareConcurrency].join('|'); }catch(e){ raw='unknown'; }
+  let h=0x811c9dc5; for(let i=0;i<raw.length;i++){ h^=raw.charCodeAt(i); h=Math.imul(h,0x01000193); }
+  return 'dev-'+(h>>>0).toString(16).padStart(8,'0');
+}
+const THIS_DEVICE = deviceFingerprint();
+MERCHANTS.forEach(v=>accounts.set(v,{id:v,name:'Merchant',vpa:v,kind:'merchant',median:2000,start:0,end:24,payees:new Set()}));
+
+// graph state: inbound senders and outbound forwards per VPA
+const inbound = new Map();   // vpa -> Map(sender -> lastTime)
+const outFwd = new Map();    // vpa -> count of outbound payments within 2h of receiving
+const lastIn = new Map();    // vpa -> last inbound time
+const history = [];          // per payer recent times for velocity
+const recentEdges = [];      // last N payments for the network
+
+let simTime = new Date('2026-10-23T18:00:00+05:30').getTime();
+
+// ---------- model ----------
+const SIGNALS = [
+  {key:'amount', label:'Amount spike', what:'How far above the payer’s usual amount (log scale)'},
+  {key:'newPayee', label:'New payee', what:'First payment to this UPI ID'},
+  {key:'oddHour', label:'Unusual hour', what:'Outside the payer’s normal active hours'},
+  {key:'newDevice', label:'New device', what:'Device not seen for this account'},
+  {key:'onCall', label:'On a call', what:'Payer was on a phone call while paying'},
+  {key:'screenShare', label:'Screen sharing', what:'A screen-sharing app was open'},
+  {key:'muleLink', label:'Mule link', what:'Receiving account looks like a mule in the payment graph'},
+  {key:'velocity', label:'Velocity', what:'Burst of payments by this payer in 30 minutes'},
+];
+let weights = {bias:-4.2, amount:0.9, newPayee:1.1, oddHour:0.8, newDevice:1.4, onCall:1.6, screenShare:2.0, muleLink:3.2, velocity:0.6};
+let lastDelta = {};
+
+function muleScore(vpa, now){
+  if(reportedIds.has((vpa||'').toLowerCase())) return {score:1, senders:0, fwd:0, reported:true};
+  const m = inbound.get(vpa); let senders = 0;
+  if(m){ const t = now ?? simTime; m.forEach((time,from)=>{ if(t-time < 72*3600000 && !related(from,vpa)) senders++; }); }
+  const fwd = outFwd.get(vpa)||0;
+  const fan = Math.max(0, Math.min(1,(senders-2)/6));
+  const forward = Math.min(1, fwd/3);
+  return {score: Math.min(1, fan*0.65 + forward*0.35), senders, fwd};
+}
+function hourOf(t){return new Date(t).toLocaleString('en-IN',{hour:'numeric',hour12:false,timeZone:'Asia/Kolkata'})|0}
+function features(p){
+  const payer = accounts.get(p.from);
+  const ratio = p.amount / Math.max(1,payer.median);
+  const h = hourOf(p.time);
+  const odd = payer.kind==='user' && !p.noTime && (h < payer.start || h >= payer.end) ? 1 : 0;
+  const recent = history.filter(x=>x.from===p.from && Math.abs(p.time - x.time) < 30*60000).length;
+  const ms = muleScore(p.to, p.time);
+  const newDev = payer.devices ? (payer.devices.size>0 && !payer.devices.has(p.device)) : p.device!==payer.device;
+  // a learned profile needs a few payments before amount, payee and hour signals mean anything
+  const learning = !!payer.dynamic && payer.amounts.length < 5;
+  return {
+    x:{amount:learning?0:Math.max(0,Math.log2(ratio)), newPayee: learning||payer.payees.has(p.to)?0:1, oddHour:learning?0:odd, newDevice:newDev?1:0,
+       onCall:p.onCall?1:0, screenShare:p.screenShare?1:0, muleLink:ms.score, velocity:Math.min(2,Math.max(0,recent-1)/2)},
+    ctx:{ratio, h, payer, ms, recent, learning}
+  };
+}
+const sigmoid = z => 1/(1+Math.exp(-z));
+function scoreX(x){let z=weights.bias; for(const s of SIGNALS) z+=weights[s.key]*x[s.key]; return 100*sigmoid(z);}
+function tierOf(score){return score>75?'block':score>=40?'hold':'allow';}
+const rupee = n => '₹'+Math.round(n).toLocaleString('en-IN');
+function fmtTime(t){return new Date(t).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Kolkata'})}
+function reasonText(key,p,ctx){
+  switch(key){
+    case 'amount': return `${rupee(p.amount)} is ${ctx.ratio.toFixed(ctx.ratio<10?1:0)}× this payer’s usual amount`;
+    case 'newPayee': return 'First payment to this UPI ID';
+    case 'oddHour': return `Paid at ${fmtTime(p.time)}, outside usual hours (${ctx.payer.start}:00–${ctx.payer.end}:00)`;
+    case 'newDevice': return 'Sent from a device not seen for this account';
+    case 'onCall': return 'Payer was on a phone call while paying';
+    case 'screenShare': return 'A screen-sharing app was open during payment';
+    case 'muleLink': return ctx.ms.reported ? 'This UPI ID is on your reported-fraud list' : `Receiving account got money from ${ctx.ms.senders} unrelated senders recently`;
+    case 'velocity': return `${ctx.recent} payments by this payer in the last 30 minutes`;
+  }
+}
+function evaluate(p){
+  const t0 = performance.now();
+  const {x,ctx} = features(p);
+  const score = scoreX(x);
+  const contrib = SIGNALS.map(s=>({key:s.key,label:s.label,v:weights[s.key]*x[s.key]})).filter(c=>Math.abs(c.v)>0.05).sort((a,b)=>b.v-a.v);
+  const reasons = contrib.filter(c=>c.v>0.3).slice(0,3).map(c=>reasonText(c.key,p,ctx));
+  const ms = performance.now()-t0;
+  return Object.assign(p,{x,score,tier:tierOf(score),contrib,reasons,ms,ctx,learning:ctx.learning});
+}
+function commit(p){
+  // update graph + profiles after scoring
+  if(!inbound.has(p.to)) inbound.set(p.to,new Map());
+  inbound.get(p.to).set(p.from,p.time);
+  // forwarding: a large inbound passed on within 2 hours
+  const li = lastIn.get(p.from);
+  if(li && li.amount>=5000 && p.time-li.time < 2*3600000 && p.amount >= 0.5*li.amount) outFwd.set(p.from,(outFwd.get(p.from)||0)+1);
+  lastIn.set(p.to,{time:p.time,amount:p.amount});
+  history.push({from:p.from,time:p.time}); if(history.length>400) history.shift();
+  recentEdges.push({from:p.from,to:p.to}); if(recentEdges.length>160) recentEdges.shift();
+  const payer = accounts.get(p.from);
+  if(payer.dynamic){ updateProfile(payer,p); return; }
+  if(p.label==='genuine' && p.tier!=='block') payer.payees.add(p.to);
+}
+
+// ---------- generator ----------
+const SCEN = {
+  genuine:'Genuine payment', arrest:'Fraud · “digital arrest” scam call', kyc:'Fraud · fake KYC update with screen sharing',
+  ato:'Fraud · account takeover on a new device', mule:'Fraud · mule account forwarding stolen money'
+};
+function genPayment(){
+  simTime += Math.round(between(2,9))*60000;
+  const r = rand();
+  let p;
+  if(r < 0.84){
+    const u = pick(users); const rr = rand();
+    let to = rr<0.68 ? pick([...u.payees]) : rr<0.88 ? pick(MERCHANTS) : pick(users.filter(o=>o!==u)).vpa;
+    let amount = Math.max(20, Math.round(u.median*lognorm(0.6)/10)*10);
+    if(rand()<0.04) amount = Math.round(u.median*between(4,8)/100)*100; // genuine big purchase
+    p = {from:u.vpa,to,amount,device:rand()<0.03?'newphone':u.device,onCall:rand()<0.06,screenShare:rand()<0.01,label:'genuine',scenario:'genuine'};
+  } else {
+    const kind = pick(['arrest','arrest','kyc','ato','mule']);
+    if(kind==='mule'){
+      const m = pick(mules); const to = pick(mules.filter(o=>o!==m)).vpa;
+      p = {from:m.vpa,to,amount:Math.round(between(18000,90000)/100)*100,device:m.device,onCall:false,screenShare:false,label:'fraud',scenario:'mule'};
+    } else {
+      const u = pick(users); const m = pick(mules);
+      const mult = kind==='arrest'?between(8,25):kind==='kyc'?between(3,9):between(5,15);
+      p = {from:u.vpa,to:m.vpa,amount:Math.round(u.median*mult/100)*100,device:kind==='ato'?'unknown-'+Math.floor(rand()*999):(rand()<0.2?'newphone':u.device),
+           onCall:kind==='arrest', screenShare:kind==='kyc', label:'fraud', scenario:kind};
+    }
+  }
+  p.time = simTime;
+  if(p.scenario==='ato'){ const h = pick([1,2,3,4]); p.time = simTime - ((hourOf(simTime)-h+24)%24)*3600000; }
+  p.id = 'TXN'+(100000+genCount++);
+  return p;
+}
+
+// ---------- state + stats ----------
+const allPayments = [];
+let genCount = 0;
+const reviewed = new Map(); // id -> 'fraud'|'genuine'
+let selectedId = null;
+
+function warmup(n){ for(let i=0;i<n;i++){ const p = evaluate(genPayment()); commit(p); } }
+function addPayment(p, manual){
+  evaluate(p); commit(p); p.manual=!!manual; allPayments.push(p);
+  if(allPayments.length>2000) allPayments.shift();
+  return p;
+}
+function stats(){
+  const n = allPayments.length; const c={allow:0,hold:0,block:0}; let fr=0,frCaught=0,gen=0,genFlag=0,lat=0;
+  for(const p of allPayments){ c[p.tier]++; lat+=p.ms;
+    // demo: measured against the synthetic truth; real modes: against your own reviews
+    const truth = MODE==='demo' ? (p.manual?null:p.label) : (reviewed.get(p.id)||null);
+    if(!truth) continue;
+    if(truth==='fraud'){fr++; if(p.tier!=='allow') frCaught++;} else {gen++; if(p.tier!=='allow') genFlag++;} }
+  return {n,c,recall:fr?frCaught/fr:null,fpr:gen?genFlag/gen:null,lat:n?lat/n:null};
+}
+
+// ---------- rendering ----------
+const $ = id => document.getElementById(id);
+const pct = (a,b) => b ? (100*a/b).toFixed(1)+'%' : '—';
+function shortVpa(v){return v.length>22 ? v.slice(0,20)+'…' : v}
+function color(tier){return getComputedStyle(document.documentElement).getPropertyValue('--'+tier).trim()}
+
+function renderKpis(){
+  const s = stats();
+  $('k-total').textContent = s.n.toLocaleString('en-IN');
+  for(const t of ['allow','hold','block']){ $('k-'+t).textContent = s.c[t].toLocaleString('en-IN'); $('k-'+t+'-p').textContent = pct(s.c[t],s.n)+' of payments'; }
+  $('k-recall').textContent = s.recall==null?'—':(100*s.recall).toFixed(1)+'%';
+  $('k-fpr').textContent = s.fpr==null?'—':(100*s.fpr).toFixed(1)+'%';
+  $('k-lat').textContent = s.lat==null?'—':s.lat.toFixed(3)+' ms';
+  $('k-recall-s').textContent = MODE==='demo' ? 'held or blocked' : 'of payments you marked fraud';
+  $('k-fpr-s').textContent = MODE==='demo' ? 'genuine payments flagged' : 'of payments you marked genuine';
+}
+function rowHtml(p){
+  const w = Math.max(3,p.score);
+  return `<tr data-id="${p.id}" class="${p.id===selectedId?'sel':''}">
+    <td class="mono">${fmtTime(p.time)}</td>
+    <td><span class="vpa">${p.from===ME_VPA?'You':shortVpa(p.from)}</span><span class="arrow">→</span><span class="vpa">${shortVpa(p.to)}</span>${p.learning?'<span class="tag">learning</span>':p.manual&&MODE==='demo'?'<span class="tag">test</span>':''}</td>
+    <td class="amt mono">${rupee(p.amount)}</td>
+    <td class="mono"><span class="bar"><i style="width:${w}%;background:var(--${p.tier})"></i></span>${Math.round(p.score)}</td>
+    <td><span class="pill ${p.tier}">${p.tier==='hold'?'Hold':p.tier==='block'?'Block':'Allow'}</span></td>
+    <td class="reason-cell">${p.reasons[0]||'Looks normal for this payer'}</td></tr>`;
+}
+function renderFeed(){
+  $('feed').innerHTML = allPayments.slice(-60).reverse().map(rowHtml).join('');
+}
+function ring(score,tier){
+  const r=44,c=2*Math.PI*r;
+  return `<div class="ring"><svg viewBox="0 0 104 104" aria-hidden="true"><circle cx="52" cy="52" r="${r}" fill="none" stroke="var(--line)" stroke-width="10"/><circle cx="52" cy="52" r="${r}" fill="none" stroke="var(--${tier})" stroke-width="10" stroke-linecap="round" stroke-dasharray="${c*score/100} ${c}"/></svg><b>${Math.round(score)}</b></div>`;
+}
+function renderDetail(){
+  const p = allPayments.find(q=>q.id===selectedId);
+  const box = $('detailBody');
+  if(!p){box.className='empty';box.innerHTML='Select a payment from the feed.';return;}
+  box.className='';
+  const max = Math.max(1,...p.contrib.map(c=>Math.abs(c.v)));
+  const tierLabel = {allow:'Allowed silently',hold:'Held — user must confirm',block:'Blocked — analyst alerted'}[p.tier];
+  box.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="score">${ring(p.score,p.tier)}
+        <dl class="facts">
+          <dt>Decision</dt><dd><span class="pill ${p.tier}">${p.tier}</span> ${tierLabel}</dd>
+          <dt>Amount</dt><dd class="mono">${rupee(p.amount)}</dd>
+          <dt>From</dt><dd class="vpa">${p.from===ME_VPA?'You':p.from}</dd>
+          <dt>To</dt><dd class="vpa">${p.to}</dd>
+          <dt>Payment</dt><dd class="mono">${p.id} · ${fmtTime(p.time)}</dd>
+        </dl>
+      </div>
+      <div><h3 style="font-size:14px;margin-bottom:6px">Why</h3>
+        ${p.reasons.length?`<ol class="reasons">${p.reasons.map(r=>`<li>${r}</li>`).join('')}</ol>`:'<p class="note">Nothing unusual for this payer.</p>'}</div>
+      <div><h3 style="font-size:14px;margin-bottom:8px">Signal contributions</h3>
+        <div class="contrib">${p.contrib.length?p.contrib.map(c=>`<div class="crow"><span>${c.label}</span><span class="ctrack"><i class="${c.v<0?'neg':''}" style="width:${100*Math.abs(c.v)/max}%"></i></span><span class="mono" style="text-align:right">${c.v>0?'+':''}${c.v.toFixed(2)}</span></div>`).join(''):'<p class="note">No signal fired.</p>'}</div></div>
+      <p class="truth">${p.source==='live'?`Live payment · scored at ${new Date(p.time).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'medium',timeZone:'Asia/Kolkata'})} on device ${p.device}${p.learning?' · still learning your profile':''}`:p.source==='statement'?`From your statement: “${(p.narration||'').slice(0,120)}”${p.noTime?' · no time in statement':''}${p.learning?' · still learning your profile':''}`:p.manual?'Manual test payment.':'Synthetic label (for measuring accuracy): '+SCEN[p.scenario]}</p>
+    </div>`;
+}
+function renderQueue(){
+  const waiting = allPayments.filter(p=>p.tier!=='allow' && !reviewed.has(p.id)).slice(-30).reverse();
+  $('queue').innerHTML = waiting.length ? waiting.slice(0,12).map(p=>`
+    <div class="qi"><div class="row"><span class="pill ${p.tier}">${p.tier} · ${Math.round(p.score)}</span><span class="mono">${rupee(p.amount)}</span></div>
+    <p><span class="vpa">${shortVpa(p.from)}</span> → <span class="vpa">${shortVpa(p.to)}</span></p>
+    <p>${p.reasons[0]||''}</p>
+    <div class="qbtns"><button class="btn" data-label="fraud" data-id="${p.id}">Fraud</button><button class="btn" data-label="genuine" data-id="${p.id}">Genuine</button><button class="btn" data-open="${p.id}">Details</button></div></div>`).join('')
+    : '<p class="empty">Nothing waiting. Held and blocked payments appear here.</p>';
+  let f=0,g=0; reviewed.forEach(v=>v==='fraud'?f++:g++);
+  $('q-rev').textContent=reviewed.size; $('q-f').textContent=f; $('q-g').textContent=g;
+}
+function renderWeights(){
+  $('weights').innerHTML = [{key:'bias',label:'Baseline',what:'Starting point before any signal'},...SIGNALS].map(s=>{
+    const d = lastDelta[s.key];
+    return `<tr><td><b>${s.label}</b></td><td style="color:var(--muted)">${s.what}</td><td class="mono" style="text-align:right">${weights[s.key].toFixed(2)}</td><td class="mono delta ${d>0?'up':d<0?'down':''}" style="text-align:right">${d==null||Math.abs(d)<0.005?'—':(d>0?'+':'')+d.toFixed(2)}</td></tr>`;}).join('');
+}
+
+// ---------- network canvas ----------
+const canvas = $('net'); const ctx2 = canvas.getContext('2d');
+let nodes = new Map();
+function layout(){
+  const ids = new Set(); recentEdges.forEach(e=>{ids.add(e.from);ids.add(e.to)});
+  const old = nodes; nodes = new Map();
+  const W = canvas.clientWidth||600, H = canvas.clientHeight||360;
+  ids.forEach(id=>{ const o=old.get(id); nodes.set(id, o?{...o}:{id,x:W/2+between(-W/3,W/3),y:H/2+between(-H/3,H/3)}); });
+  const arr=[...nodes.values()];
+  for(let it=0;it<90;it++){
+    for(let i=0;i<arr.length;i++){ const a=arr[i]; a.fx=(W/2-a.x)*0.004; a.fy=(H/2-a.y)*0.004;
+      for(let j=0;j<arr.length;j++){ if(i===j) continue; const b=arr[j]; let dx=a.x-b.x, dy=a.y-b.y; let d2=dx*dx+dy*dy+0.01; const f=900/d2; a.fx+=dx*f/Math.sqrt(d2); a.fy+=dy*f/Math.sqrt(d2);} }
+    recentEdges.forEach(e=>{ const a=nodes.get(e.from), b=nodes.get(e.to); if(!a||!b) return; const dx=b.x-a.x, dy=b.y-a.y; const d=Math.sqrt(dx*dx+dy*dy)||1; const f=(d-60)*0.01; a.fx+=dx/d*f; a.fy+=dy/d*f; b.fx-=dx/d*f; b.fy-=dy/d*f; });
+    arr.forEach(a=>{ a.x=Math.max(10,Math.min(W-10,a.x+Math.max(-6,Math.min(6,a.fx)))); a.y=Math.max(10,Math.min(H-10,a.y+Math.max(-6,Math.min(6,a.fy)))); });
+  }
+}
+function drawNet(){
+  const dpr = window.devicePixelRatio||1; const W=canvas.clientWidth, H=canvas.clientHeight;
+  if(!W) return;
+  canvas.width=W*dpr; canvas.height=H*dpr; ctx2.setTransform(dpr,0,0,dpr,0,0); ctx2.clearRect(0,0,W,H);
+  const cs = getComputedStyle(document.documentElement);
+  const cEdge=cs.getPropertyValue('--edge').trim(), cNode=cs.getPropertyValue('--node').trim(), cHold=cs.getPropertyValue('--hold').trim(), cBlock=cs.getPropertyValue('--block').trim(), cInk=cs.getPropertyValue('--ink').trim();
+  const sel = allPayments.find(q=>q.id===selectedId);
+  ctx2.lineWidth=1;
+  recentEdges.forEach(e=>{ const a=nodes.get(e.from), b=nodes.get(e.to); if(!a||!b) return; ctx2.strokeStyle=cEdge; ctx2.beginPath(); ctx2.moveTo(a.x,a.y); ctx2.lineTo(b.x,b.y); ctx2.stroke(); });
+  if(sel){ const a=nodes.get(sel.from), b=nodes.get(sel.to); if(a&&b){ ctx2.strokeStyle=cInk; ctx2.lineWidth=2.5; ctx2.beginPath(); ctx2.moveTo(a.x,a.y); ctx2.lineTo(b.x,b.y); ctx2.stroke(); } }
+  nodes.forEach(n=>{ const ms=muleScore(n.id).score; const acc=accounts.get(n.id);
+    const r = acc&&acc.kind==='merchant'?4:ms>0.5?8:ms>0.2?6:4.5;
+    ctx2.fillStyle = ms>0.5?cBlock:ms>0.2?cHold:cNode; ctx2.beginPath(); ctx2.arc(n.x,n.y,r,0,Math.PI*2); ctx2.fill();
+    if(ms>0.5){ ctx2.fillStyle=cInk; ctx2.font='11px "JetBrains Mono", monospace'; ctx2.fillText(n.id.split('@')[0].slice(0,18), n.x+10, n.y+4); }
+  });
+}
+
+// ---------- phone tester ----------
+function fillTester(){
+  $('fFrom').innerHTML = users.map(u=>`<option value="${u.vpa}">${u.name} · usual ${rupee(u.median)}</option>`).join('');
+  $('fFrom').value = users[1].vpa; fillTo();
+}
+function fillTo(){
+  const u = accounts.get($('fFrom').value);
+  const known = [...u.payees].slice(0,4);
+  const strangers = users.filter(o=>o!==u && !u.payees.has(o.vpa)).slice(0,2);
+  $('fTo').innerHTML = `<optgroup label="Paid before">${known.map(v=>`<option value="${v}">${v}</option>`).join('')}</optgroup>
+    <optgroup label="Never paid">${strangers.map(o=>`<option value="${o.vpa}">${o.vpa}</option>`).join('')}</optgroup>
+    <optgroup label="Unknown accounts">${[6,0,1,4].map(i=>`<option value="${mules[i].vpa}">${mules[i].vpa}</option>`).join('')}</optgroup>`;
+  $('fTo').value = mules[6].vpa;
+}
+function phoneIdle(){
+  const to = MODE!=='demo' ? (($('fToText').value||'').trim() || 'enter a UPI ID') : $('fTo').value;
+  $('screen').innerHTML = `<h3>Pay</h3><div class="payee"><span class="note">To</span><span class="vpa">${to.replace(/[<>&"]/g,'')}</span></div><div class="big mono">${rupee(+$('fAmt').value||0)}</div><p class="note">Press Pay to run PayKavach on this payment.</p>`;
+}
+let countdown=null;
+function phoneResult(p){
+  clearInterval(countdown);
+  if(p.tier==='allow'){
+    $('screen').innerHTML = `<div class="alertbox allow"><b>Payment successful</b><span class="mono">${rupee(p.amount)} to ${shortVpa(p.to)}</span><span class="note">Risk score ${Math.round(p.score)}. Nothing unusual.</span></div><div class="stack"><button class="btn" id="again">New payment</button></div>`;
+  } else if(p.tier==='hold'){
+    $('screen').innerHTML = `<div class="alertbox hold"><b>Wait — check before you pay</b><span>${rupee(p.amount)} to <span class="vpa">${shortVpa(p.to)}</span></span><ul>${p.reasons.map(r=>`<li>${r}</li>`).join('')}</ul><span class="note">Scammers often pose as police, bank or KYC staff. No real officer asks for payment over UPI.</span></div>
+      <div class="stack"><button class="btn primary" id="cancelPay">Cancel payment</button><button class="btn" id="continuePay" disabled>Continue in 5 s</button></div>`;
+    let s=5; countdown=setInterval(()=>{s--; const b=$('continuePay'); if(!b){clearInterval(countdown);return;} if(s<=0){clearInterval(countdown); b.disabled=false; b.textContent='I understand, pay anyway';} else b.textContent=`Continue in ${s} s`;},1000);
+  } else {
+    $('screen').innerHTML = `<div class="alertbox block"><b>Payment stopped</b><span>${rupee(p.amount)} to <span class="vpa">${shortVpa(p.to)}</span> was not sent.</span><ul>${p.reasons.map(r=>`<li>${r}</li>`).join('')}</ul><span class="note">Your bank has been alerted. If someone is pressuring you on a call, hang up and call 1930, the national cyber-fraud helpline.</span></div><div class="stack"><button class="btn" id="again">New payment</button></div>`;
+  }
+}
+$('screen').addEventListener('click',e=>{
+  if(e.target.id==='again'){phoneIdle();}
+  if(e.target.id==='cancelPay'){clearInterval(countdown); $('screen').innerHTML=`<div class="alertbox allow"><b>Payment cancelled</b><span>No money left your account.</span></div><div class="stack"><button class="btn" id="again">New payment</button></div>`; toast('Payment cancelled by the user');}
+  if(e.target.id==='continuePay'){ $('screen').innerHTML=`<div class="alertbox hold"><b>Sent after warning</b><span>The confirmation is logged for the bank.</span></div><div class="stack"><button class="btn" id="again">New payment</button></div>`; }
+});
+$('fFrom').addEventListener('change',()=>{fillTo();phoneIdle();});
+['fTo','fAmt','fToText'].forEach(id=>$(id).addEventListener('input',phoneIdle));
+$('payForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  if(MODE!=='demo'){ livePay(); return; }
+  const u = accounts.get($('fFrom').value);
+  const [hh,mm] = ($('fTime').value||'12:00').split(':').map(Number);
+  const d = new Date(simTime); const t = new Date(d.toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+  const base = simTime - ((t.getHours()*60+t.getMinutes())*60000) + (hh*60+mm)*60000;
+  const p = {id:'TEST'+(allPayments.length+1),from:u.vpa,to:$('fTo').value,amount:Math.max(1,+$('fAmt').value||1),time:base,device:$('fDev').checked?'brand-new':u.device,onCall:$('fCall').checked,screenShare:$('fShare').checked,label:'test',scenario:'genuine'};
+  addPayment(p,true); selectedId=p.id; phoneResult(p); renderAll(true);
+});
+
+// ---------- analyst + retrain ----------
+function label(id,lab){ reviewed.set(id,lab); if(MODE==='live') saveLive(); renderQueue(); renderKpis(); }
+$('queue').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.open){ selectedId=b.dataset.open; renderDetail(); renderFeed(); drawNet(); $('detail').scrollIntoView({behavior:'smooth',block:'nearest'}); return; }
+  label(b.dataset.id,b.dataset.label);
+});
+$('autolabel').addEventListener('click',()=>{
+  const waiting = allPayments.filter(p=>!p.manual && !reviewed.has(p.id));
+  const flagged = waiting.filter(p=>p.tier!=='allow').slice(-12), sampled = waiting.filter(p=>p.tier==='allow').slice(-8);
+  [...flagged,...sampled].forEach(p=>reviewed.set(p.id,p.label));
+  renderQueue(); toast(`Labelled ${flagged.length+sampled.length} payments from the synthetic truth`);
+});
+$('retrain').addEventListener('click',()=>{
+  const data = allPayments.filter(p=>reviewed.has(p.id)).map(p=>({x:p.x,y:reviewed.get(p.id)==='fraud'?1:0}));
+  const nf = data.filter(d=>d.y).length, ng = data.length-nf;
+  if(nf<5||ng<5){ $('retrainNote').textContent=`Need at least 5 fraud and 5 genuine labels — you have ${nf} fraud and ${ng} genuine. Try “Label 20 from demo truth”.`; return; }
+  const before = {...weights}; const keys=['bias',...SIGNALS.map(s=>s.key)];
+  const prior = {...weights};
+  for(let ep=0;ep<300;ep++){
+    const g={}; keys.forEach(k=>g[k]=0);
+    for(const d of data){ let z=weights.bias; SIGNALS.forEach(s=>z+=weights[s.key]*d.x[s.key]); const err=sigmoid(z)-d.y; g.bias+=err; SIGNALS.forEach(s=>g[s.key]+=err*d.x[s.key]); }
+    keys.forEach(k=>{ weights[k] -= 0.05*(g[k]/data.length + 0.02*(weights[k]-prior[k])); });
+  }
+  lastDelta={}; keys.forEach(k=>lastDelta[k]=weights[k]-before[k]);
+  allPayments.forEach(p=>{ p.score=scoreX(p.x); p.tier=tierOf(p.score); p.contrib=SIGNALS.map(s=>({key:s.key,label:s.label,v:weights[s.key]*p.x[s.key]})).filter(c=>Math.abs(c.v)>0.05).sort((a,b)=>b.v-a.v); p.reasons=p.contrib.filter(c=>c.v>0.3).slice(0,3).map(c=>reasonText(c.key,p,p.ctx)); });
+  $('retrainNote').textContent = `Retrained on ${data.length} labels (${nf} fraud, ${ng} genuine) and re-scored all ${allPayments.length} payments.`;
+  renderAll(true); toast('Model retrained');
+});
+
+// ---------- loop ----------
+let timer=null, running=true;
+function tick(){ const p=addPayment(genPayment(),false); if(!selectedId && p.tier!=='allow') selectedId=p.id; renderAll(allPayments.length%6===0); }
+function renderAll(relayout){
+  if(MODE!=='demo'){ renderProfile(); renderKpis(); renderFeed(); renderDetail(); renderQueue(); renderWeights(); if(relayout) layout(); drawNet(); return; }
+  $('clock').textContent = new Date(simTime).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Kolkata'})+' IST';
+  renderKpis(); renderFeed(); renderDetail(); renderQueue(); renderWeights();
+  if(relayout) layout(); drawNet();
+}
+function start(){ clearInterval(timer); timer=setInterval(tick,+$('speed').value); running=true; $('toggle').textContent='Pause stream'; $('live').classList.remove('paused'); }
+function stop(){ clearInterval(timer); running=false; $('toggle').textContent='Resume stream'; $('live').classList.add('paused'); }
+$('toggle').addEventListener('click',()=>running?stop():start());
+$('speed').addEventListener('change',()=>{ if(running) start(); });
+$('feed').addEventListener('click',e=>{ const tr=e.target.closest('tr'); if(!tr) return; selectedId=tr.dataset.id; renderFeed(); renderDetail(); drawNet(); });
+let toastT; function toast(msg){ const t=$('toast'); t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true,2400); }
+window.addEventListener('resize',()=>{layout();drawNet();});
+try{ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',drawNet); }catch(e){}
+new MutationObserver(drawNet).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+// ---------- data source modes ----------
+let MODE = 'demo';
+let liveClock = null;
+function resetState(){
+  inbound.clear(); outFwd.clear(); lastIn.clear(); history.length=0; recentEdges.length=0; allPayments.length=0;
+  reviewed.clear(); selectedId=null; nodes=new Map(); lastDelta={};
+}
+function bootDemo(){
+  resetState(); users.forEach(u=>u.payees=new Set(u.circle));
+  warmup(260); for(let i=0;i<45;i++) addPayment(genPayment(),false);
+  selectedId = (allPayments.slice().reverse().find(p=>p.tier==='block')||allPayments[allPayments.length-1]).id;
+}
+const store = {
+  get(k){ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+};
+function saveLive(){ store.set('paykavach-live',{payments:allPayments.filter(p=>p.source==='live').slice(-300).map(p=>({id:p.id,to:p.to,amount:p.amount,time:p.time,device:p.device,onCall:p.onCall,screenShare:p.screenShare})),reviewed:[...reviewed].filter(([id])=>id.startsWith('LIVE'))}); }
+function saveReported(){ store.set('paykavach-reported',[...reportedIds]); }
+function readReported(){ reportedIds.clear(); $('reported').value.split(/[\s,]+/).map(x=>x.trim().toLowerCase()).filter(x=>x.includes('@')).forEach(x=>reportedIds.add(x)); }
+function bootLive(){
+  resetState(); resetMe();
+  const saved = store.get('paykavach-live');
+  if(saved && saved.payments){ saved.payments.forEach(r=>addPayment(Object.assign({from:ME_VPA,label:'live',source:'live'},r),true)); (saved.reviewed||[]).forEach(([id,v])=>reviewed.set(id,v)); }
+  selectedId = allPayments.length ? allPayments[allPayments.length-1].id : null;
+}
+function bootStatement(){ resetState(); resetMe(); }
+function renderProfile(){
+  $('pf-n').textContent = me.amounts.length;
+  $('pf-med').textContent = me.amounts.length ? rupee(me.median) : '—';
+  $('pf-hrs').textContent = me.hours.length>=8 ? `${me.start}:00–${me.end}:00` : 'learning';
+  $('pf-pay').textContent = me.payees.size;
+  $('pf-dev').textContent = THIS_DEVICE;
+  $('pf-devn').textContent = me.devices.size;
+  $('payeeList').innerHTML = [...me.payees].slice(-30).map(v=>`<option value="${v}"></option>`).join('');
+}
+function setMode(m){
+  MODE = m; stop(); clearInterval(liveClock);
+  document.querySelectorAll('#modeSeg button').forEach(b=>b.setAttribute('aria-selected', String(b.dataset.mode===m)));
+  ['demo','live','statement'].forEach(k=>$('src-'+k).hidden = k!==m);
+  const real = m!=='demo';
+  $('toggle').hidden = real; $('speed').hidden = real; document.querySelector('label[for=speed]').hidden = real;
+  $('lblFrom').hidden = real; $('lblTo').hidden = real; $('lblToText').hidden = !real; $('lblTime').hidden = real; $('timeNow').hidden = !real;
+  $('autolabel').hidden = real;
+  $('retrainNote').textContent = real ? 'Mark payments as fraud or genuine. Retraining needs at least 5 of each.' : 'Analyst verdicts become training labels. Retraining needs at least 5 fraud and 5 genuine labels.';
+  $('fDevLbl').textContent = real ? 'Pretend this is a new device' : 'New device';
+  $('testerNote').textContent = real ? `Paying as you, from device ${THIS_DEVICE}, at the real current time.` : 'Preset: a “digital arrest” scam call. Change the fields to explore.';
+  if(m==='demo'){ bootDemo(); fillTester(); $('fCall').checked=true; $('fAmt').value=45000; }
+  if(m==='live'){ bootLive(); $('fCall').checked=false; $('fAmt').value=250; $('fToText').value=''; $('live').classList.remove('paused');
+    const tickClock=()=>{ $('clock').textContent=new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'Asia/Kolkata'})+' IST · live'; };
+    tickClock(); liveClock=setInterval(tickClock,1000); }
+  if(m==='statement'){ bootStatement(); $('fCall').checked=false; $('fAmt').value=500; $('fToText').value=''; $('live').classList.add('paused'); $('csvMsg').textContent=''; ['st-rows','st-debits','st-period'].forEach(id=>$(id).textContent='—'); }
+  phoneIdle(); layout(); renderAll(false);
+  if(m==='demo' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) start();
+}
+$('modeSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b && b.dataset.mode!==MODE) setMode(b.dataset.mode); });
+$('reported').addEventListener('input',()=>{ readReported(); saveReported(); allPayments.forEach(p=>{ evaluate(p); }); renderAll(true); });
+$('liveReset').addEventListener('click',()=>{ store.set('paykavach-live',null); bootLive(); phoneIdle(); renderAll(true); toast('Live history cleared'); });
+
+let liveSeq = 0;
+function livePay(){
+  const to = ($('fToText').value||'').trim().toLowerCase();
+  if(!/^[a-z0-9._\-]{2,}@[a-z0-9.\-]{2,}$/i.test(to)){ $('screen').innerHTML = `<div class="alertbox block"><b>Enter a UPI ID</b><span>Use the form name@bank, for example ravi.k@oksbi.</span></div>`; return; }
+  const p = {id:(MODE==='live'?'LIVE':'TRY')+Date.now().toString(36)+(liveSeq++),from:ME_VPA,to,amount:Math.max(1,+$('fAmt').value||1),time:Date.now(),
+    device:$('fDev').checked?'other-device':THIS_DEVICE,onCall:$('fCall').checked,screenShare:$('fShare').checked,label:'live',source:MODE==='live'?'live':'statement'};
+  addPayment(p,true); selectedId=p.id; phoneResult(p); if(MODE==='live') saveLive(); renderAll(true);
+}
+
+// ---------- statement parsing ----------
+function parseCSV(text){
+  const rows=[]; let row=[], cell='', q=false;
+  for(let i=0;i<text.length;i++){ const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){cell+='"';i++;} else q=false; } else cell+=ch; }
+    else if(ch==='"') q=true; else if(ch===','||ch===';'||ch==='\t'){ row.push(cell); cell=''; }
+    else if(ch==='\n'||ch==='\r'){ if(ch==='\r'&&text[i+1]==='\n') i++; row.push(cell); rows.push(row); row=[]; cell=''; }
+    else cell+=ch; }
+  if(cell||row.length){ row.push(cell); rows.push(row); }
+  return rows.map(r=>r.map(c=>c.trim())).filter(r=>r.some(c=>c));
+}
+const MONTHS={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function parseDate(s){
+  s=(s||'').trim(); let m;
+  if((m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return [+m[1],+m[2],+m[3]];
+  if((m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/))) return [m[3].length===2?2000+ +m[3]:+m[3],+m[2],+m[1]];
+  if((m=s.match(/^(\d{1,2})[\s\-]([A-Za-z]{3})[A-Za-z]*[\s\-,]+(\d{2,4})/))) return [m[3].length===2?2000+ +m[3]:+m[3],MONTHS[m[2].toLowerCase()]||0,+m[1]];
+  if((m=s.match(/^([A-Za-z]{3})[A-Za-z]*\s+(\d{1,2}),?\s+(\d{4})/))) return [+m[3],MONTHS[m[1].toLowerCase()]||0,+m[2]];
+  return null;
+}
+function parseTime(s){ const m=(s||'').match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(am|pm)?/i); if(!m) return null; let h=+m[1]; if(m[3]){ const pm=m[3].toLowerCase()==='pm'; if(pm&&h<12)h+=12; if(!pm&&h===12)h=0; } return [h,+m[2]]; }
+const money = s => { const v=parseFloat(String(s||'').replace(/[₹,\s]|INR|Rs\.?/gi,'')); return isFinite(v)?v:0; };
+function readStatement(text){
+  const rows=parseCSV(text); const hi=rows.findIndex(r=>r.some(c=>/date/i.test(c)));
+  if(hi<0) throw new Error('No header row with a “Date” column was found.');
+  const H=rows[hi].map(c=>c.toLowerCase()); const col=re=>H.findIndex(h=>re.test(h));
+  const cDate=col(/(txn|transaction)?\s*date/), cTime=col(/^time|txn time|transaction time/), cDesc=col(/narration|description|particulars|remarks|details|transaction/),
+        cDr=col(/withdrawal|debit|dr\.?\s*amt|dr\.?\s*amount|^dr$|paid/), cCr=col(/deposit|credit|cr\.?\s*amt|cr\.?\s*amount|^cr$|received/),
+        cAmt=col(/^amount|amount \(|amt/), cType=col(/type|dr\s*\/\s*cr|cr\s*\/\s*dr/);
+  if(cDate<0 || (cDr<0 && cAmt<0)) throw new Error('Could not find the date and debit (or amount) columns.');
+  const out=[]; let bad=0;
+  for(const r of rows.slice(hi+1)){
+    const d=parseDate(r[cDate]); if(!d||!d[1]){ bad++; continue; }
+    let amt=0;
+    if(cDr>=0) amt=money(r[cDr]);
+    else { const v=money(r[cAmt]); const t=cType>=0?(r[cType]||''):''; amt = /dr|debit|paid|sent/i.test(t) ? Math.abs(v) : (!t && v<0 ? -v : 0); }
+    if(!(amt>0)) continue;
+    const desc = cDesc>=0 ? r[cDesc] : r.join(' ');
+    const t = parseTime(cTime>=0 ? r[cTime] : r[cDate]);
+    const vpa = (desc.match(/[a-z0-9._\-]{2,}@[a-z]{2,}/i)||[])[0];
+    const payee = vpa ? vpa.toLowerCase() : desc.replace(/\d{6,}/g,'').replace(/[^a-z ]/gi,' ').replace(/\s+/g,' ').trim().toLowerCase().slice(0,28) || 'unknown payee';
+    const [hh,mm] = t || [12,0];
+    out.push({to:payee,amount:amt,time:Date.UTC(d[0],d[1]-1,d[2],hh,mm)-330*60000,noTime:!t,narration:desc});
+  }
+  out.sort((a,b)=>a.time-b.time);
+  return {rows:rows.length-hi-1,payments:out,bad};
+}
+function sampleStatement(){
+  const r=mulberry32(7); const lines=['Date,Time,Description,Debit,Credit'];
+  const payees=[['annapoorna.mess@ibl','ANNAPOORNA MESS',[60,180]],['freshbasket.grocer@ybl','FRESHBASKET GROCER',[200,900]],['metrocard.recharge@okaxis','METRO CARD RECHARGE',[200,500]],
+    ['ravi.k@oksbi','RAVI KUMAR',[100,1500]],['campus.books@okicici','CAMPUS BOOKS',[150,700]],['quickcab.rides@paytm','QUICKCAB RIDES',[90,350]],['amma.home@okhdfcbank','AMMA',[500,3000]]];
+  let day=new Date(Date.UTC(2026,8,1)); let ref=482910000000;
+  for(let i=0;i<46;i++){
+    day=new Date(day.getTime()+Math.floor(r()*2)*86400000); const p=payees[Math.floor(r()*payees.length)];
+    const amt=Math.round((p[2][0]+r()*(p[2][1]-p[2][0]))/10)*10; const h=8+Math.floor(r()*14), m=Math.floor(r()*60);
+    const ds=`${String(day.getUTCDate()).padStart(2,'0')}/${String(day.getUTCMonth()+1).padStart(2,'0')}/2026`;
+    lines.push(`${ds},${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')},UPI/DR/${ref++}/${p[1]}/${p[0]}/Payment,${amt},`);
+    if(i%9===0) lines.push(`${ds},10:05,NEFT CR SCHOLARSHIP VIT,,${5000}`);
+  }
+  lines.push('14/10/2026,23:48,UPI/DR/482910099901/CUSTOMS CLEARANCE/customs.clearance.in@oksbi/Parcel fee,18500,');
+  lines.push('14/10/2026,23:52,UPI/DR/482910099902/CUSTOMS CLEARANCE/customs.clearance.in@oksbi/Penalty,24000,');
+  lines.push('15/10/2026,02:10,UPI/DR/482910099903/KYC HELPDESK/kyc.helpdesk24@ybl/KYC update,9999,');
+  return lines.join('\n');
+}
+$('sampleCsv').addEventListener('click',()=>{ $('csvText').value=sampleStatement(); $('csvMsg').textContent='Sample loaded: a synthetic month of student UPI spending with three scam payments at the end. Press “Score statement”.'; $('csvMsg').className='ok-line'; });
+$('csvFile').addEventListener('change',e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ $('csvText').value=rd.result; $('csvMsg').textContent=`Loaded ${f.name}. Press “Score statement”.`; $('csvMsg').className='ok-line'; }; rd.readAsText(f); });
+$('analyse').addEventListener('click',()=>{
+  bootStatement(); readReported();
+  let res; try{ res=readStatement($('csvText').value); }catch(err){ $('csvMsg').textContent=err.message+' Export a CSV statement, or try the sample to see the format.'; $('csvMsg').className='err-line'; renderAll(true); return; }
+  if(!res.payments.length){ $('csvMsg').textContent='No outgoing payments were found in this file.'; $('csvMsg').className='err-line'; renderAll(true); return; }
+  res.payments.forEach((r,i)=>addPayment(Object.assign({id:'ST'+String(i+1).padStart(4,'0'),from:ME_VPA,device:'statement',onCall:false,screenShare:false,label:'statement',source:'statement'},r),true));
+  const flagged=allPayments.filter(p=>p.tier!=='allow');
+  selectedId=(flagged[flagged.length-1]||allPayments[allPayments.length-1]).id;
+  const first=allPayments[0].time, last=allPayments[allPayments.length-1].time; const f=t=>new Date(t).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric',timeZone:'Asia/Kolkata'});
+  $('st-rows').textContent=res.rows; $('st-debits').textContent=allPayments.length; $('st-period').textContent=`${f(first)} – ${f(last)}`;
+  $('clock').textContent=`Statement · ${f(first)} – ${f(last)}`;
+  $('csvMsg').textContent=`Scored ${allPayments.length} payments: ${flagged.length} would have been held or blocked.${res.bad?` ${res.bad} rows had unreadable dates and were skipped.`:''}`; $('csvMsg').className='ok-line';
+  renderAll(true); toast('Statement scored');
+});
+
+// boot: synthetic demo in a realistic working state; restore the reported list
+(store.get('paykavach-reported')||[]).forEach(v=>reportedIds.add(v)); $('reported').value=[...reportedIds].join('\n');
+fillTester(); setMode('demo');
+</script>
+
+</body></html>
